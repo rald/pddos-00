@@ -65,7 +65,10 @@ int main() {
 
 	int f=0;
 	int z=8;
+	int c=12;
 	bool g=true;
+
+	word start;
 
 	Canvas *mouse=NULL;
 
@@ -142,6 +145,7 @@ int main() {
 	font=Canvas_LoadCVS("font-00.cvs");
 
 
+	start=*myclock;
 
 	while(!quit) {
 

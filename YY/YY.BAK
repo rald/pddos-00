@@ -48,6 +48,19 @@ int main() {
 		SetPalette(i,r,g,b);
 	}
 
+	for(i=16;i<256;i++) {
+		int r=(int)((pal[0] & 0xFF0000L) >> 16);
+		int g=(int)((pal[0] & 0x00FF00L) >> 8);
+		int b=(int)((pal[0] & 0x0000FFL));
+		r=(int)((double)r/255*63);
+		g=(int)((double)g/255*63);
+		b=(int)((double)b/255*63);
+
+		SetPalette(i,r,g,b);
+	}
+
+
+
 	while(!quit) {
 
 		if(kbhit()) {
@@ -67,6 +80,8 @@ int main() {
 		f++;
 
 	}
+
+	SetMode();
 
 	return 0;
 }
