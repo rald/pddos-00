@@ -4,10 +4,17 @@
 #define CANVAS_IMPLEMENTATION
 #include "canvas.h"
 
+#define MOUSE_IMPLEMENTATION
+#include "mouse.h"
+
+
+
 #include <stdio.h>
 #include <dos.h>
 #include <conio.h>
 #include <time.h>
+
+
 
 
 dword pal[] = {
@@ -35,6 +42,9 @@ double deltaTime;
 
 
 
+
+
+
 volatile char keys[128];
 void interrupt (*old09)(void);
 void interrupt new09(void) {
@@ -53,17 +63,41 @@ void interrupt new09(void) {
 
 
 
+void DrawText(byte* srf,Canvas *font,int x,int y,int z,char *text) {
+	int i;
+	int xc=x,yc=y;
+	for(i=0;i<strlen(text);i++) {
+		Canvas_Draw(srf,font,xc,yc,text[i],z);
+		xc+=font->w;
+		if(xc>=SCREEN_WIDTH) {
+			xc=0;
+			yc+=font->h;
+			if(yc>=SCREEN_HEIGHT) {
+				break;
+			}
+		}
+	}
+}
+
+
+
 int main() {
 
 	byte *buf=calloc(SCREEN_SIZE,sizeof(byte));
-	Canvas *arrows=Canvas_LoadCVS("arrows.cvs");
+
+	Canvas *sprite=Canvas_LoadCVS("robo.cvs");
+	Canvas *num=Canvas_LoadCVS("num.cvs");
+	Canvas *mouse=Canvas_LoadCVS("mouse.cvs");
+
 	int f=0,key;
 	bool quit=false;
 	int i,j;
-	float x=0,y=0;
-	float speed=50;
-	int arrowsFrame=0;
-	int moving=false;
+	int board[10][10];
+
+	word mouse_on=0;
+	word num_buttons=0;
+	word mouse_x=0,mouse_y=0;
+	word mouse_buttons=0;
 
 
 	srand(time(NULL));
@@ -94,11 +128,29 @@ int main() {
 
 
 
+	Mouse_Init(&mouse_on,&num_buttons);
+
+	if(!mouse_on) {
+		printf("Error: cannot initialize mouse\n");
+		return 1;
+	}
+
+
+
 	old09 = getvect(0x09);
 	setvect(0x09, new09);
 
 	for(i=0;i<128;i++) keys[i]=0;
 
+
+
+
+
+	for(j=0;j<10;j++) {
+		for(i=0;i<10;i++) {
+			board[j][i]=(((rand()%7)<<4)&0xF0) | ((rand()%4)&0x0F);
+		}
+	}
 
 
 	lastTime=clock();
@@ -109,21 +161,36 @@ int main() {
 		deltaTime=(double)(currentTime-lastTime)/CLK_TCK;
 		lastTime=currentTime;
 
+		Mouse_Status(&mouse_x,&mouse_y,&mouse_buttons);
+
+		if(mouse_x<0) mouse_x=0;
+		if(mouse_y<0) mouse_y=0;
+		if(mouse_x>639) mouse_x=639;
+		if(mouse_y>199) mouse_y=199;
+
+
 		if(keys[0x01]) quit=true;
 
-		if(keys[0x11]) {y-=speed*deltaTime; arrowsFrame=0;}
-		if(keys[0x1F]) {y+=speed*deltaTime; arrowsFrame=2;}
-		if(keys[0x1E]) {x-=speed*deltaTime; arrowsFrame=1;}
-		if(keys[0x20]) {x+=speed*deltaTime; arrowsFrame=3;}
 
-		if(x<0) x=0;
-		if(x>SCREEN_WIDTH-arrows->w) x=SCREEN_WIDTH-arrows->w;
-		if(y<0) y=0;
-		if(y>SCREEN_HEIGHT-arrows->h) y=SCREEN_HEIGHT-arrows->h;
 
 		memset(buf,0,SCREEN_SIZE);
 
-		Canvas_Draw(buf,arrows,x,y,arrowsFrame,1);
+		for(j=0;j<10;j++) {
+			Canvas_Draw(buf,num,0,j*16+16,j,1);
+			for(i=0;i<10;i++) {
+				Canvas_Draw(buf,num,i*16+16,0,i,1);
+			}
+    }
+
+		for(j=0;j<10;j++) {
+			for(i=0;i<10;i++) {
+				DrawRect(buf,i*16+16,j*16+16,16,16,12);
+			}
+		}
+
+		Canvas_Draw(buf,mouse,mouse_x>>1,mouse_y,0,1);
+
+
 
 		vsync();
 		memcpy(VGA,buf,SCREEN_SIZE);
