@@ -61,9 +61,8 @@ int main() {
 	bool quit=false;
 	int i,j;
 	float x=0,y=0;
-	float speed=50;
+	float speed=100;
 	int arrowsFrame=0;
-	int moving=false;
 
 	srand(time(NULL));
 

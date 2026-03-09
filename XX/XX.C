@@ -235,10 +235,21 @@ int main() {
 		DrawText(buf,font,32+z+z,canvas->h*z+z+z/2,1,msg);
 
 
-
+/*
 		Canvas_Draw(buf,canvas,0,0,f,z);
+*/
 
 		Canvas_Draw(buf,canvas,SCREEN_WIDTH-canvas->w,0,f,1);
+
+
+		for(j=0;j<canvas->h;j++) {
+			for(i=0;i<canvas->w;i++) {
+				FillRect(buf,i*z+1,j*z+1,z-2,z-2,
+					canvas->pixels[f*canvas->w*canvas->h+j*canvas->w+i]
+				);
+			}
+		}
+
 
 		if(g) {
 			for(i=0;i<=canvas->w;i++) {
