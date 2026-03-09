@@ -1,8 +1,0 @@
-all: xx.exe
-
-xx.exe: xx.c
-  tcc -ml xx.c
-
-clean:
-  del xx.exe
-
