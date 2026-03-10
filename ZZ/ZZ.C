@@ -14,6 +14,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <dos.h>
 #include <conio.h>
 #include <time.h>
@@ -39,6 +40,10 @@ dword pal[] = {
 
 clock_t lastTime,currentTime;
 double deltaTime;
+
+float sgn(float x) {
+	return x<0?-1:x>0?1:0;
+}
 
 volatile char keys[128];
 void interrupt (*old09)(void);
@@ -103,17 +108,17 @@ int main(void) {
 
 	Canvas *sprite=Canvas_LoadCVS("robo.cvs");
 	Canvas *mouse=Canvas_LoadCVS("mouse.cvs");
+	Canvas *font=Canvas_LoadCVS("font-00.cvs");
 
 
 	Board *board=Board_Load("level-00.rob");
-
-
-
 
 	int f=0,key;
 	bool quit=false;
 	int i,j,k;
 	int flr,str;
+	bool hold=false;
+	int nstars=0;
 
 	word mouse_on=0;
 	word num_buttons=0;
@@ -139,9 +144,6 @@ int main(void) {
 	setvect(0x09, new09);
 	for(i=0;i<128;i++) keys[i]=0;
 
-
-
-
 	lastTime=clock();
 	while(!quit) {
 		currentTime=clock();
@@ -160,19 +162,51 @@ int main(void) {
 		memset(buf,0,SCREEN_SIZE);
 
 
+		nstars=0;
 		for(j=0;j<board->h;j++) {
 			for(i=0;i<board->w;i++) {
 				k=j*board->w+i;
 				flr=board->tiles[k] & 0x03;
 				str=board->tiles[k] & 0x04;
 				Canvas_Draw(buf,sprite,i*16,j*16,flr+17,1);
-				if(str) Canvas_Draw(buf,sprite,i*16,j*16,25,1);
+				if(str) {
+					nstars++;
+					Canvas_Draw(buf,sprite,i*16,j*16,25,1);
+				}
 			}
+		}
+
+		k=board->y*board->w+board->x;
+		if(board->tiles[k] & 0x04) {
+			board->tiles[k] &= 0x03;
 		}
 
 		Canvas_Draw(buf,sprite,board->x*16,board->y*16,board->d+21,1);
 
 		Canvas_Draw(buf,mouse,mouse_x>>1,mouse_y,0,1);
+
+
+		if(!hold) {
+			if(keys[0x11]) {
+				hold=true;
+				switch(board->d) {
+					case 0: board->y-=1; break;
+					case 1: board->x+=1; break;
+					case 2: board->y+=1; break;
+					case 3: board->x-=1; break;
+				}
+			} else if(keys[0x1E]) {
+				hold=true;
+				board->d--; if(board->d<0) board->d=3;
+			} else if(keys[0x20]) {
+				hold=true;
+				board->d++; if(board->d>3) board->d=0;
+			}
+		}
+
+		if(!(keys[0x11] || keys[0x1E] || keys[0x20])) hold=false;
+
+
 
 		vsync();
 		memcpy(VGA,buf,SCREEN_SIZE);
@@ -185,11 +219,7 @@ int main(void) {
 	Canvas_Free(sprite);
 	Canvas_Free(mouse);
 
-
-
 	setvect(0x09, old09);
-
-
 
 	SetMode(0x03);
 
