@@ -47,6 +47,8 @@ typedef enum {
 
 GameState gameState=GAME_STATE_CODE;
 
+bool key_pressed=false;
+
 int code[100];
 int color=0;
 int x=0,y=0,z=0;
@@ -140,6 +142,7 @@ int main(void) {
 	word num_buttons=0;
 	word mouse_x=0,mouse_y=0;
 	word mouse_buttons=0;
+	bool mouse_hold=false;
 
 	srand(time(NULL));
 
@@ -159,7 +162,7 @@ int main(void) {
 
 	Palette_Init();
 
-	for(i=0;i<100;i++) code[i]=68;
+	for(i=0;i<100;i++) code[i]=0x44;
 
 	lastTime=clock();
 	while(!quit) {
@@ -203,6 +206,14 @@ int main(void) {
 
 				Canvas_Draw(buf,sprite,board->x*16,board->y*16,board->d+21,1);
 
+				if(!hold) {
+					if(keys[0x0F]) {
+						hold=true;
+						gameState=GAME_STATE_CODE;
+					}
+				}
+
+
 				break;
 
 			case GAME_STATE_CODE:
@@ -234,26 +245,54 @@ int main(void) {
 
 				DrawRect(buf,(z%7)*16+(SCREEN_WIDTH-16*7),z/7*16,16,16,12);
 
-				if( mouse_buttons==1 &&
-						inrect(mouse_x>>1,mouse_y,16,16,16*10,16*10)) {
-					i=((mouse_x>>1)-16)/16;
-					j=(mouse_y-16)/16;
-					k=j*10+i;
-					if(z>=0 && z<=16) {
-						code[k] = (code[k] & 0x03) | (z<<2);
-					} else if(z==17) {
-						code[k] = 0x44;
-					} else if(z>=18 && z<=20) {
-						code[k] = (code[k] & 0x7C) | (z-17);
+				if(!mouse_hold) {
+					if(mouse_buttons==1) {
+						mouse_hold=true;
+						if(inrect(mouse_x>>1,mouse_y,16,16,16*10,16*10)) {
+							i=((mouse_x>>1)-16)/16;
+							j=(mouse_y-16)/16;
+							k=j*10+i;
+							if(z>=0 && z<=16) {
+								code[k] = (code[k] & 0x03) | (z<<2);
+							} else if(z==17) {
+								clr=code[k] & 0x03;
+								cmd=(code[k] & 0x7C)>>2;
+								if(cmd==17) {
+									code[k]=(17<<2) | 0x00;
+								} else {
+									code[k]=(17<<2) | clr;
+								}
+							} else if(z>=18 && z<=20) {
+								code[k] = (code[k] & 0x7C) | (z-17);
+							}
+						}
+          }
+				}
+
+				if(!hold) {
+					if(keys[0x0F]) {
+						hold=true;
+						gameState=GAME_STATE_BOARD;
 					}
-
-
 				}
 
 
 				break;
 
 			default: break;
+		}
+
+		key_pressed=false;
+		for(i=0;i<128;i++) {
+			if(keys[i]) {
+				key_pressed=true;
+				break;
+			}
+		}
+		if(!key_pressed) hold=false;
+
+		if(mouse_buttons==0) {
+			mouse_hold=false;
 		}
 
 		Canvas_Draw(buf,mouse,mouse_x>>1,mouse_y,0,1);
