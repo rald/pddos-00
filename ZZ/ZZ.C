@@ -123,7 +123,7 @@ void Palette_Init() {
 	}
 }
 
-int main(void) {
+int main(int argc,char **argv) {
 
 	byte *buf=calloc(SCREEN_SIZE,sizeof(byte));
 
@@ -131,7 +131,8 @@ int main(void) {
 	Canvas *mouse=Canvas_LoadCVS("mouse.cvs");
 	Canvas *font=Canvas_LoadCVS("font-00.cvs");
 
-	Board *board=Board_Load("level-00.rob");
+	Board *board=NULL;
+
 
 	int f=0;
 	bool quit=false;
@@ -150,6 +151,13 @@ int main(void) {
 	bool mouse_hold=false;
 
 	srand(time(NULL));
+
+	if(argc!=2) {
+		printf("syntax: %s level-00.rob\n",argv[0]);
+		return 1;
+	}
+
+	board=Board_Load(argv[1]);
 
 	Mouse_Init(&mouse_on,&num_buttons);
 
