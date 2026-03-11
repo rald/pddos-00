@@ -1,9 +1,8 @@
 #ifndef BOARD_H
 #define BOARD_H
 
+#include <stdio.h>
 #include <stdlib.h>
-
-
 
 typedef struct {
 	int w,h;
@@ -26,6 +25,8 @@ Board *Board_Load(char *filename) {
 
 	int ch;
 	int i;
+
+	if(fp==NULL) exit(1);
 
 	fscanf(fp,
 		"%d,%d,%d,%d,%d",

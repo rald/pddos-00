@@ -52,7 +52,7 @@ bool key_pressed=false;
 int code[100];
 int color=0;
 int x=0,y=0,z=10;
-int blink=0;
+
 
 #define CSTK_MAX 20
 word cstk[CSTK_MAX];
@@ -127,12 +127,11 @@ int main(int argc,char **argv) {
 
 	byte *buf=calloc(SCREEN_SIZE,sizeof(byte));
 
-	Canvas *sprite=Canvas_LoadCVS("robo.cvs");
-	Canvas *mouse=Canvas_LoadCVS("mouse.cvs");
-	Canvas *font=Canvas_LoadCVS("font-00.cvs");
+	Canvas *sprite=NULL;
+	Canvas *mouse=NULL;
+	Canvas *font=NULL;
 
 	Board *board=NULL;
-
 
 	int f=0;
 	bool quit=false;
@@ -141,7 +140,6 @@ int main(int argc,char **argv) {
 	bool hold=false;
 	int nstars=0;
 	int cmd,clr;
-	int blink=0;
 	int tile,tclr,tstr;
 
 	word mouse_on=0;
@@ -153,11 +151,21 @@ int main(int argc,char **argv) {
 	srand(time(NULL));
 
 	if(argc!=2) {
-		printf("syntax: %s level-00.rob\n",argv[0]);
+		fprintf(stderr,"syntax: %s level-00.rob\n",argv[0]);
 		return 1;
 	}
 
 	board=Board_Load(argv[1]);
+
+	sprite=Canvas_LoadCVS("robo.cvs");
+	mouse=Canvas_LoadCVS("mouse.cvs");
+	font=Canvas_LoadCVS("font-00.cvs");
+
+	old09 = getvect(0x09);
+	setvect(0x09, new09);
+	for(i=0;i<128;i++) keys[i]=0;
+
+	SetMode(0x13);
 
 	Mouse_Init(&mouse_on,&num_buttons);
 
@@ -165,13 +173,6 @@ int main(int argc,char **argv) {
 		printf("Error: cannot initialize mouse\n");
 		return 1;
 	}
-
-	old09 = getvect(0x09);
-	setvect(0x09, new09);
-	for(i=0;i<128;i++) keys[i]=0;
-
-
-	SetMode(0x13);
 
 	Palette_Init();
 
@@ -242,6 +243,19 @@ int main(int argc,char **argv) {
 					continue;
 				}
 
+				l=board->y*board->w+board->x;
+				tile=board->tiles[l];
+				tclr=tile & 0x03;
+/*
+				tstr=(tile & 0x04) >> 2;
+*/
+
+				if(tclr==0) {
+					gameState=GAME_STATE_GAMEOVER;
+					continue;
+				}
+
+
 				if(!hold) {
 					if(keys[0x0F]) {
 
@@ -252,15 +266,6 @@ int main(int argc,char **argv) {
 
 						hold=true;
 
-						l=board->y*board->w+board->x;
-						tile=board->tiles[l];
-						tclr=tile & 0x03;
-						tstr=(tile & 0x04) >> 2;
-
-						if(tclr==0) {
-							gameState=GAME_STATE_GAMEOVER;
-							continue;
-						}
 
 						k=y*10+x;
 						clr=(code[k] & 0x03);
@@ -375,15 +380,6 @@ int main(int argc,char **argv) {
 				}
 
 				DrawRect(buf,x*16+16,y*16+16,16,16,12);
-
-/*
-				if(blink<50) {
-					DrawRect(buf,x*16+16,y*16+16,16,16,12);
-				}
-
-				blink++;
-				if(blink>=100) blink=0;
-*/
 
 				for(k=0;k<21;k++) {
 					i=(k%7)*16+(SCREEN_WIDTH-16*7);
@@ -513,6 +509,10 @@ int main(int argc,char **argv) {
 
 	}
 
+
+
+	SetMode(0x03);
+
 	Board_Free(board);
 
 	Canvas_Free(font);
@@ -521,7 +521,9 @@ int main(int argc,char **argv) {
 
 	setvect(0x09, old09);
 
-	SetMode(0x03);
+	free(buf);
+	buf=NULL;
+
 
 	return 0;
 }
