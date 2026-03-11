@@ -307,7 +307,6 @@ int main(void) {
 									ip=cstk[csp++];
 									x=ip%10;
 									y=ip/10;
-									x++;
 								} else {
 									gameState=GAME_STATE_GAMEOVER;
 									continue;
@@ -332,7 +331,7 @@ int main(void) {
 						if(x>9) {
 							if(csp<CSTK_MAX) {
 								ip=cstk[csp++];
-								x=ip%10+1;
+								x=ip%10;
 								y=ip/10;
 							} else {
 								gameState=GAME_STATE_GAMEOVER;
