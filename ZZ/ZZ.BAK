@@ -38,6 +38,20 @@ dword pal[] = {
 	0x333C57L
 };
 
+typedef enum {
+	GAME_STATE_BOARD=0,
+	GAME_STATE_CODE,
+	GAME_STATE_GAMEOVER,
+	GAME_STATE_MAX
+} GameState;
+
+GameState gameState=GAME_STATE_CODE;
+
+int code[100];
+int color=0;
+int x=0,y=0,z=0;
+
+
 clock_t lastTime,currentTime;
 double deltaTime;
 
@@ -119,6 +133,8 @@ int main(void) {
 	int flr,str;
 	bool hold=false;
 	int nstars=0;
+	int cmd,clr;
+	int blink=0;
 
 	word mouse_on=0;
 	word num_buttons=0;
@@ -134,15 +150,16 @@ int main(void) {
 		return 1;
 	}
 
+	old09 = getvect(0x09);
+	setvect(0x09, new09);
+	for(i=0;i<128;i++) keys[i]=0;
+
 
 	SetMode(0x13);
 
 	Palette_Init();
 
-
-	old09 = getvect(0x09);
-	setvect(0x09, new09);
-	for(i=0;i<128;i++) keys[i]=0;
+	for(i=0;i<100;i++) code[i]=68;
 
 	lastTime=clock();
 	while(!quit) {
@@ -162,64 +179,108 @@ int main(void) {
 		memset(buf,0,SCREEN_SIZE);
 
 
-		nstars=0;
-		for(j=0;j<board->h;j++) {
-			for(i=0;i<board->w;i++) {
-				k=j*board->w+i;
-				flr=board->tiles[k] & 0x03;
-				str=board->tiles[k] & 0x04;
-				Canvas_Draw(buf,sprite,i*16,j*16,flr+17,1);
-				if(str) {
-					nstars++;
-					Canvas_Draw(buf,sprite,i*16,j*16,25,1);
+		switch(gameState) {
+			case GAME_STATE_BOARD:
+
+				nstars=0;
+				for(j=0;j<board->h;j++) {
+					for(i=0;i<board->w;i++) {
+						k=j*board->w+i;
+						flr=board->tiles[k] & 0x03;
+						str=board->tiles[k] & 0x04;
+						Canvas_Draw(buf,sprite,i*16,j*16,flr+17,1);
+						if(str) {
+							nstars++;
+							Canvas_Draw(buf,sprite,i*16,j*16,25,1);
+						}
+					}
 				}
-			}
-		}
 
-		k=board->y*board->w+board->x;
-		if(board->tiles[k] & 0x04) {
-			board->tiles[k] &= 0x03;
-		}
+				k=board->y*board->w+board->x;
+				if(board->tiles[k] & 0x04) {
+					board->tiles[k] &= 0x03;
+				}
 
-		if(nstars<=0) {
-			return 1;
-		}
+				Canvas_Draw(buf,sprite,board->x*16,board->y*16,board->d+21,1);
 
-		Canvas_Draw(buf,sprite,board->x*16,board->y*16,board->d+21,1);
+				break;
+
+			case GAME_STATE_CODE:
+
+				for(j=0;j<10;j++) {
+					Canvas_Draw(buf,sprite,0,j*16+16,j,1);
+					for(i=0;i<10;i++) {
+						k=j*10+i;
+						Canvas_Draw(buf,sprite,i*16+16,0,i,1);
+
+						cmd = (code[k] & 0x7C) >> 2;
+						clr = (code[k] & 0x03);
+
+						Canvas_Draw(buf,sprite,i*16+16,j*16+16,clr+17,1);
+						Canvas_Draw(buf,sprite,i*16+16,j*16+16,cmd,1);
+
+					}
+				}
+
+				for(k=0;k<21;k++) {
+					i=(k%7)*16+(SCREEN_WIDTH-16*7);
+					j=k/7*16;
+					Canvas_Draw(buf,sprite,i,j,k,1);
+					if(	mouse_buttons==1 &&
+							inrect(mouse_x>>1,mouse_y,i,j,16,16)) {
+						z=k;
+					}
+				}
+
+				DrawRect(buf,(z%7)*16+(SCREEN_WIDTH-16*7),z/7*16,16,16,12);
+
+				if( mouse_buttons==1 &&
+						inrect(mouse_x>>1,mouse_y,16,16,16*10,16*10)) {
+					i=((mouse_x>>1)-16)/16;
+					j=(mouse_y-16)/16;
+					k=j*10+i;
+					if(z>=0 && z<=16) {
+						code[k] = (code[k] & 0x03) | (z<<2);
+					} else if(z==17) {
+						code[k] = 0x44;
+					} else if(z>=18 && z<=20) {
+						code[k] = (code[k] & 0x7C) | (z-17);
+					}
+
+
+				}
+
+
+				break;
+
+			default: break;
+		}
 
 		Canvas_Draw(buf,mouse,mouse_x>>1,mouse_y,0,1);
 
-
-		if(!hold) {
-			if(keys[0x11]) {
-				hold=true;
-				switch(board->d) {
-					case 0: board->y-=1; break;
-					case 1: board->x+=1; break;
-					case 2: board->y+=1; break;
-					case 3: board->x-=1; break;
-				}
-			} else if(keys[0x1E]) {
-				hold=true;
-				board->d--; if(board->d<0) board->d=3;
-			} else if(keys[0x20]) {
-				hold=true;
-				board->d++; if(board->d>3) board->d=0;
-			}
-		}
-
-		if(!(keys[0x11] || keys[0x1E] || keys[0x20])) hold=false;
-
-
-
 		vsync();
 		memcpy(VGA,buf,SCREEN_SIZE);
+
+/*
+		gotoxy(1,1);
+		for(i=0;i<128;i++) {
+			if(keys[i]) printf("%02X ",i);
+		}
+		printf("\n");
+*/
+
+/*
+		gotoxy(1,1);
+		printf("%d",mouse_buttons);
+*/
 
 		f++;
 
 	}
 
+	Board_Free(board);
 
+	Canvas_Free(font);
 	Canvas_Free(sprite);
 	Canvas_Free(mouse);
 

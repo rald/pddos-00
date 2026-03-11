@@ -13,7 +13,7 @@ typedef struct {
 } Board;
 
 Board *Board_Load(char *filename);
-void Board_Free(Board **board);
+void Board_Free(Board *board);
 
 
 
@@ -48,11 +48,10 @@ Board *Board_Load(char *filename) {
 
 }
 
-void Board_Free(Board **board) {
-	free((*board)->tiles);
-	(*board)->tiles=NULL;
-	free(*board);
-	(*board)=NULL;
+void Board_Free(Board *board) {
+	free(board->tiles);
+	board->tiles=NULL;
+	free(board);
 }
 
 #endif /* BOARD_IMPLEMENTATION */
