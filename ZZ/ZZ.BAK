@@ -258,6 +258,11 @@ int main(void) {
 						clr=(code[k] & 0x03);
 						cmd=(code[k] & 0x7C) >> 2;
 
+						if(clr!=0x00 && clr!=tclr) {
+							x++;
+							continue;
+						}
+
 						switch(cmd) {
 							case 0: case 1: case 2: case 3: case 4:
 							case 5: case 6: case 7: case 8: case 9:
