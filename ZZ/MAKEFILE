@@ -1,0 +1,9 @@
+all: zz.exe
+
+zz.exe: zz.c
+				tcc -G -ml -ezz zz.c
+
+clean:
+        del zz.exe
+
+

@@ -62,6 +62,30 @@ word ip=0;
 clock_t lastTime,currentTime;
 double deltaTime;
 
+Canvas *sprite=NULL;
+Canvas *mouse=NULL;
+Canvas *font=NULL;
+Board *board=NULL;
+
+int f=0;
+bool quit=false;
+int i,j,k,l;
+int flr,str;
+bool hold=false;
+int nstars=0;
+int cmd,clr;
+int tile,tclr,tstr;
+
+word mouse_on=0;
+word num_buttons=0;
+word mouse_x=0,mouse_y=0;
+word mouse_buttons=0;
+bool mouse_hold=false;
+
+byte *buf=NULL;
+
+
+
 float sgn(float x) {
 	return x<0?-1:x>0?1:0;
 }
@@ -123,30 +147,293 @@ void Palette_Init() {
 	}
 }
 
+void Do_Board() {
+	nstars=0;
+	for(j=0;j<board->h;j++) {
+		for(i=0;i<board->w;i++) {
+			k=j*board->w+i;
+			flr=board->tiles[k] & 0x03;
+			str=board->tiles[k] & 0x04;
+			Canvas_Draw(buf,sprite,i*16,j*16,flr+17,1);
+			if(str) {
+				nstars++;
+				Canvas_Draw(buf,sprite,i*16,j*16,25,1);
+			}
+		}
+	}
+
+	if(	board->x >= 0 &&
+			board->x < board->w &&
+			board->y >= 0 &&
+			board->y < board->h) {
+
+		k=board->y*board->w+board->x;
+		if(board->tiles[k] & 0x04) {
+			board->tiles[k] &= 0x03;
+		}
+
+		Canvas_Draw(buf,sprite,board->x*16,board->y*16,board->d+21,1);
+	}
+
+	Canvas_Draw(buf,sprite,0,SCREEN_HEIGHT-16,y,1);
+	for(i=0;i<10;i++) {
+		Canvas_Draw(buf,sprite,i*16+16,SCREEN_HEIGHT-16-16,i,1);
+		k=y*10+i;
+		cmd=(code[k] & 0x7C)>>2;
+		clr=(code[k] & 0x03);
+		Canvas_Draw(buf,sprite,i*16+16,SCREEN_HEIGHT-16,clr+17,1);
+		Canvas_Draw(buf,sprite,i*16+16,SCREEN_HEIGHT-16,cmd,1);
+	}
+	if(x<10) DrawRect(buf,x*16+16,SCREEN_HEIGHT-16,16,16,12);
+
+	j=0;
+	for(i=csp;i<CSTK_MAX;i++) {
+		ip=cstk[i];
+		Canvas_Draw(buf,sprite,j*16,SCREEN_HEIGHT-16*3,ip/10,1);
+		j++;
+	}
+
+	if(nstars==0) {
+		gameState = GAME_STATE_GAMEOVER;
+		return;
+	}
+
+	if(	board->x < 0 ||
+			board->x >= board->w ||
+			board->y < 0 ||
+			board->y >= board->h) {
+		gameState = GAME_STATE_GAMEOVER;
+		return;
+	}
+
+	l=board->y*board->w+board->x;
+	tile=board->tiles[l];
+	tclr=tile & 0x03;
+	/*
+	tstr=(tile & 0x04) >> 2;
+	*/
+
+	if(tclr==0) {
+		gameState = GAME_STATE_GAMEOVER;
+		return;
+	}
+
+	if(!hold) {
+		if(keys[0x0F]) {
+
+			hold=true;
+			gameState=GAME_STATE_CODE;
+			return;
+
+		} else if(keys[0x1C]) {
+
+			hold=true;
+
+			k=y*10+x;
+			clr=(code[k] & 0x03);
+			cmd=(code[k] & 0x7C) >> 2;
+
+			if(clr!=0x00 && clr!=tclr) {
+				x++;
+				return;
+			}
+
+			switch(cmd) {
+				case 0: case 1: case 2: case 3: case 4:
+				case 5: case 6: case 7: case 8: case 9:
+					if(csp>0) {
+						ip=y*10+x+1;
+						cstk[--csp]=ip;
+						x=0;
+						y=cmd;
+					} else {
+						gameState=GAME_STATE_GAMEOVER;
+						return;
+					}
+					break;
+				case 10:
+					switch(board->d) {
+						case 0:
+							board->y--;
+							x++;
+							break;
+						case 1:
+							board->x++;
+							x++;
+							break;
+						case 2:
+							board->y++;
+							x++;
+							break;
+						case 3:
+							board->x--;
+							x++;
+							break;
+						default: break;
+					}
+					break;
+				case 11:
+					board->d++;
+					if(board->d>3) board->d=0;
+					x++;
+					break;
+				case 12:
+					board->d--;
+					if(board->d<0) board->d=3;
+					x++;
+					break;
+				case 13:
+					if(csp<CSTK_MAX) {
+						ip=cstk[csp++];
+						x=ip%10;
+						y=ip/10;
+					} else {
+						gameState=GAME_STATE_GAMEOVER;
+						return;
+					}
+					break;
+				case 14:
+					board->tiles[l] = (board->tiles[l] & 0x04) | 0x01;
+					x++;
+					break;
+				case 15:
+					board->tiles[l] = (board->tiles[l] & 0x04) | 0x02;
+					x++;
+					break;
+				case 16:
+					board->tiles[l] = (board->tiles[l] & 0x04) | 0x03;
+					x++;
+					break;
+				case 17: x++; break;
+				default: break;
+			}
+
+			if(x>9) {
+				if(csp<CSTK_MAX) {
+					ip=cstk[csp++];
+					x=ip%10;
+					y=ip/10;
+				} else {
+					gameState=GAME_STATE_GAMEOVER;
+					return;
+				}
+			}
+
+		}
+	}
+}
+
+void Do_Code() {
+	for(j=0;j<10;j++) {
+		Canvas_Draw(buf,sprite,0,j*16+16,j,1);
+		for(i=0;i<10;i++) {
+			k=j*10+i;
+			Canvas_Draw(buf,sprite,i*16+16,0,i,1);
+
+			cmd = (code[k] & 0x7C) >> 2;
+			clr = (code[k] & 0x03);
+
+			Canvas_Draw(buf,sprite,i*16+16,j*16+16,clr+17,1);
+			Canvas_Draw(buf,sprite,i*16+16,j*16+16,cmd,1);
+
+		}
+	}
+
+	DrawRect(buf,x*16+16,y*16+16,16,16,12);
+
+	for(k=0;k<21;k++) {
+		i=(k%7)*16+(SCREEN_WIDTH-16*7);
+		j=k/7*16;
+		Canvas_Draw(buf,sprite,i,j,k,1);
+		if(	mouse_buttons==1 &&
+				inrect(mouse_x>>1,mouse_y,i,j,16,16)) {
+			z=k;
+		}
+	}
+
+	DrawRect(buf,(z%7)*16+(SCREEN_WIDTH-16*7),z/7*16,16,16,12);
+
+	if(!mouse_hold) {
+		if(mouse_buttons==1) {
+			mouse_hold=true;
+			if(inrect(mouse_x>>1,mouse_y,16,16,16*10,16*10)) {
+				i=((mouse_x>>1)-16)/16;
+				j=(mouse_y-16)/16;
+				k=j*10+i;
+				if(z>=0 && z<=16) {
+					code[k] = (code[k] & 0x03) | (z<<2);
+				} else if(z==17) {
+					clr=code[k] & 0x03;
+					cmd=(code[k] & 0x7C)>>2;
+					if(cmd==17) {
+						code[k]=(17<<2) | 0x00;
+					} else {
+						code[k]=(17<<2) | clr;
+					}
+				} else if(z>=18 && z<=20) {
+					code[k] = (code[k] & 0x7C) | (z-17);
+				}
+			}
+		}
+	}
+
+	if(!hold) {
+		if(keys[0x0F]) {
+			hold=true;
+			gameState=GAME_STATE_BOARD;
+			return;
+		}
+	}
+}
+
+void Do_GameOver() {
+	nstars=0;
+	for(j=0;j<board->h;j++) {
+		for(i=0;i<board->w;i++) {
+			k=j*board->w+i;
+			flr=board->tiles[k] & 0x03;
+			str=board->tiles[k] & 0x04;
+			Canvas_Draw(buf,sprite,i*16,j*16,flr+17,1);
+			if(str) {
+				nstars++;
+				Canvas_Draw(buf,sprite,i*16,j*16,25,1);
+			}
+		}
+	}
+
+	k=board->y*board->w+board->x;
+	if(board->tiles[k] & 0x04) {
+		board->tiles[k] &= 0x03;
+	}
+
+	Canvas_Draw(buf,sprite,board->x*16,board->y*16,board->d+21,1);
+
+	Canvas_Draw(buf,sprite,0,SCREEN_HEIGHT-16,y,1);
+	for(i=0;i<10;i++) {
+		Canvas_Draw(buf,sprite,i*16+16,SCREEN_HEIGHT-16-16,i,1);
+		k=y*10+i;
+		cmd=(code[k] & 0x7C)>>2;
+		clr=(code[k] & 0x03);
+		Canvas_Draw(buf,sprite,i*16+16,SCREEN_HEIGHT-16,clr+17,1);
+		Canvas_Draw(buf,sprite,i*16+16,SCREEN_HEIGHT-16,cmd,1);
+	}
+	if(x<10) DrawRect(buf,x*16+16,SCREEN_HEIGHT-16,16,16,12);
+
+	j=0;
+	for(i=csp;i<CSTK_MAX;i++) {
+		ip=cstk[i];
+		Canvas_Draw(buf,sprite,j*16,SCREEN_HEIGHT-16*3,ip/10,1);
+		j++;
+	}
+
+	DrawText(buf,font,0,0,1,"Game Over");
+
+}
+
 int main(int argc,char **argv) {
 
-	byte *buf=calloc(SCREEN_SIZE,sizeof(byte));
+	buf=calloc(SCREEN_SIZE,sizeof(byte));
 
-	Canvas *sprite=NULL;
-	Canvas *mouse=NULL;
-	Canvas *font=NULL;
-
-	Board *board=NULL;
-
-	int f=0;
-	bool quit=false;
-	int i,j,k,l;
-	int flr,str;
-	bool hold=false;
-	int nstars=0;
-	int cmd,clr;
-	int tile,tclr,tstr;
-
-	word mouse_on=0;
-	word num_buttons=0;
-	word mouse_x=0,mouse_y=0;
-	word mouse_buttons=0;
-	bool mouse_hold=false;
 
 	srand(time(NULL));
 
@@ -179,7 +466,9 @@ int main(int argc,char **argv) {
 	for(i=0;i<100;i++) code[i]=0x44;
 
 	lastTime=clock();
+
 	while(!quit) {
+
 		currentTime=clock();
 		deltaTime=(double)(currentTime-lastTime)/CLK_TCK;
 		lastTime=currentTime;
@@ -196,281 +485,9 @@ int main(int argc,char **argv) {
 		memset(buf,0,SCREEN_SIZE);
 
 		switch(gameState) {
-			case GAME_STATE_BOARD:
-
-				nstars=0;
-				for(j=0;j<board->h;j++) {
-					for(i=0;i<board->w;i++) {
-						k=j*board->w+i;
-						flr=board->tiles[k] & 0x03;
-						str=board->tiles[k] & 0x04;
-						Canvas_Draw(buf,sprite,i*16,j*16,flr+17,1);
-						if(str) {
-							nstars++;
-							Canvas_Draw(buf,sprite,i*16,j*16,25,1);
-						}
-					}
-				}
-
-				k=board->y*board->w+board->x;
-				if(board->tiles[k] & 0x04) {
-					board->tiles[k] &= 0x03;
-				}
-
-
-				Canvas_Draw(buf,sprite,board->x*16,board->y*16,board->d+21,1);
-
-				Canvas_Draw(buf,sprite,0,SCREEN_HEIGHT-16,y,1);
-				for(i=0;i<10;i++) {
-					Canvas_Draw(buf,sprite,i*16+16,SCREEN_HEIGHT-16-16,i,1);
-					k=y*10+i;
-					cmd=(code[k] & 0x7C)>>2;
-					clr=(code[k] & 0x03);
-					Canvas_Draw(buf,sprite,i*16+16,SCREEN_HEIGHT-16,clr+17,1);
-					Canvas_Draw(buf,sprite,i*16+16,SCREEN_HEIGHT-16,cmd,1);
-				}
-				if(x<10) DrawRect(buf,x*16+16,SCREEN_HEIGHT-16,16,16,12);
-
-				j=0;
-				for(i=csp;i<CSTK_MAX;i++) {
-					ip=cstk[i];
-					Canvas_Draw(buf,sprite,j*16,SCREEN_HEIGHT-16*3,ip/10,1);
-					j++;
-				}
-
-				if(nstars==0) {
-					gameState=GAME_STATE_GAMEOVER;
-					continue;
-				}
-
-				l=board->y*board->w+board->x;
-				tile=board->tiles[l];
-				tclr=tile & 0x03;
-/*
-				tstr=(tile & 0x04) >> 2;
-*/
-
-				if(tclr==0) {
-					gameState=GAME_STATE_GAMEOVER;
-					continue;
-				}
-
-
-				if(!hold) {
-					if(keys[0x0F]) {
-
-						hold=true;
-						gameState=GAME_STATE_CODE;
-
-					} else if(keys[0x1C]) {
-
-						hold=true;
-
-
-						k=y*10+x;
-						clr=(code[k] & 0x03);
-						cmd=(code[k] & 0x7C) >> 2;
-
-						if(clr!=0x00 && clr!=tclr) {
-							x++;
-							continue;
-						}
-
-						switch(cmd) {
-							case 0: case 1: case 2: case 3: case 4:
-							case 5: case 6: case 7: case 8: case 9:
-								if(csp>0) {
-									ip=y*10+x+1;
-									cstk[--csp]=ip;
-									x=0;
-									y=cmd;
-								} else {
-									gameState=GAME_STATE_GAMEOVER;
-									continue;
-								}
-								break;
-							case 10:
-								switch(board->d) {
-									case 0:
-										board->y--;
-										x++;
-										break;
-									case 1:
-										board->x++;
-										x++;
-										break;
-									case 2:
-										board->y++;
-										x++;
-										break;
-									case 3:
-										board->x--;
-										x++;
-										break;
-									default: break;
-								}
-								break;
-							case 11:
-								board->d++;
-								if(board->d>3) board->d=0;
-								x++;
-								break;
-							case 12:
-								board->d--;
-								if(board->d<0) board->d=3;
-								x++;
-								break;
-							case 13:
-								if(csp<CSTK_MAX) {
-									ip=cstk[csp++];
-									x=ip%10;
-									y=ip/10;
-								} else {
-									gameState=GAME_STATE_GAMEOVER;
-									continue;
-								}
-								break;
-							case 14:
-								board->tiles[l] = (board->tiles[l] & 0x04) | 0x01;
-								x++;
-								break;
-							case 15:
-								board->tiles[l] = (board->tiles[l] & 0x04) | 0x02;
-								x++;
-								break;
-							case 16:
-								board->tiles[l] = (board->tiles[l] & 0x04) | 0x03;
-								x++;
-								break;
-							case 17: x++; break;
-							default: break;
-						}
-
-						if(x>9) {
-							if(csp<CSTK_MAX) {
-								ip=cstk[csp++];
-								x=ip%10;
-								y=ip/10;
-							} else {
-								gameState=GAME_STATE_GAMEOVER;
-								continue;
-							}
-						}
-
-					}
-				}
-
-				break;
-
-			case GAME_STATE_CODE:
-
-				for(j=0;j<10;j++) {
-					Canvas_Draw(buf,sprite,0,j*16+16,j,1);
-					for(i=0;i<10;i++) {
-						k=j*10+i;
-						Canvas_Draw(buf,sprite,i*16+16,0,i,1);
-
-						cmd = (code[k] & 0x7C) >> 2;
-						clr = (code[k] & 0x03);
-
-						Canvas_Draw(buf,sprite,i*16+16,j*16+16,clr+17,1);
-						Canvas_Draw(buf,sprite,i*16+16,j*16+16,cmd,1);
-
-					}
-				}
-
-				DrawRect(buf,x*16+16,y*16+16,16,16,12);
-
-				for(k=0;k<21;k++) {
-					i=(k%7)*16+(SCREEN_WIDTH-16*7);
-					j=k/7*16;
-					Canvas_Draw(buf,sprite,i,j,k,1);
-					if(	mouse_buttons==1 &&
-							inrect(mouse_x>>1,mouse_y,i,j,16,16)) {
-						z=k;
-					}
-				}
-
-				DrawRect(buf,(z%7)*16+(SCREEN_WIDTH-16*7),z/7*16,16,16,12);
-
-				if(!mouse_hold) {
-					if(mouse_buttons==1) {
-						mouse_hold=true;
-						if(inrect(mouse_x>>1,mouse_y,16,16,16*10,16*10)) {
-							i=((mouse_x>>1)-16)/16;
-							j=(mouse_y-16)/16;
-							k=j*10+i;
-							if(z>=0 && z<=16) {
-								code[k] = (code[k] & 0x03) | (z<<2);
-							} else if(z==17) {
-								clr=code[k] & 0x03;
-								cmd=(code[k] & 0x7C)>>2;
-								if(cmd==17) {
-									code[k]=(17<<2) | 0x00;
-								} else {
-									code[k]=(17<<2) | clr;
-								}
-							} else if(z>=18 && z<=20) {
-								code[k] = (code[k] & 0x7C) | (z-17);
-							}
-						}
-          }
-				}
-
-				if(!hold) {
-					if(keys[0x0F]) {
-						hold=true;
-						gameState=GAME_STATE_BOARD;
-					}
-				}
-
-				break;
-
-			case GAME_STATE_GAMEOVER:
-
-				nstars=0;
-				for(j=0;j<board->h;j++) {
-					for(i=0;i<board->w;i++) {
-						k=j*board->w+i;
-						flr=board->tiles[k] & 0x03;
-						str=board->tiles[k] & 0x04;
-						Canvas_Draw(buf,sprite,i*16,j*16,flr+17,1);
-						if(str) {
-							nstars++;
-							Canvas_Draw(buf,sprite,i*16,j*16,25,1);
-						}
-					}
-				}
-
-				k=board->y*board->w+board->x;
-				if(board->tiles[k] & 0x04) {
-					board->tiles[k] &= 0x03;
-				}
-
-				Canvas_Draw(buf,sprite,board->x*16,board->y*16,board->d+21,1);
-
-				Canvas_Draw(buf,sprite,0,SCREEN_HEIGHT-16,y,1);
-				for(i=0;i<10;i++) {
-					Canvas_Draw(buf,sprite,i*16+16,SCREEN_HEIGHT-16-16,i,1);
-					k=y*10+i;
-					cmd=(code[k] & 0x7C)>>2;
-					clr=(code[k] & 0x03);
-					Canvas_Draw(buf,sprite,i*16+16,SCREEN_HEIGHT-16,clr+17,1);
-					Canvas_Draw(buf,sprite,i*16+16,SCREEN_HEIGHT-16,cmd,1);
-				}
-				if(x<10) DrawRect(buf,x*16+16,SCREEN_HEIGHT-16,16,16,12);
-
-				j=0;
-				for(i=csp;i<CSTK_MAX;i++) {
-					ip=cstk[i];
-					Canvas_Draw(buf,sprite,j*16,SCREEN_HEIGHT-16*3,ip/10,1);
-					j++;
-				}
-
-
-				DrawText(buf,font,0,0,1,"Game Over");
-				break;
-
+			case GAME_STATE_BOARD: Do_Board(); break;
+			case GAME_STATE_CODE:  Do_Code(); break;
+			case GAME_STATE_GAMEOVER: Do_GameOver(); break;
 			default: break;
 		}
 
@@ -508,8 +525,6 @@ int main(int argc,char **argv) {
 		f++;
 
 	}
-
-
 
 	SetMode(0x03);
 

@@ -26,7 +26,10 @@ Board *Board_Load(char *filename) {
 	int ch;
 	int i;
 
-	if(fp==NULL) exit(1);
+	if(fp==NULL) {
+		fprintf(stderr,"Error: can't open file %s: %s",filename,strerror(errno));
+		exit(1);
+	}
 
 	fscanf(fp,
 		"%d,%d,%d,%d,%d",
