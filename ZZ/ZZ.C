@@ -209,9 +209,9 @@ void Do_Board() {
 	l=board->y*board->w+board->x;
 	tile=board->tiles[l];
 	tclr=tile & 0x03;
-	/*
+/*
 	tstr=(tile & 0x04) >> 2;
-	*/
+*/
 
 	if(tclr==0) {
 		gameState = GAME_STATE_GAMEOVER;
@@ -438,7 +438,8 @@ int main(int argc,char **argv) {
 	srand(time(NULL));
 
 	if(argc!=2) {
-		fprintf(stderr,"syntax: %s level-00.rob\n",argv[0]);
+		char *path=strrchr(argv[0],'\\');
+		fprintf(stderr,"Syntax: %s LEVEL-00.ROB\n",path+1);
 		return 1;
 	}
 
